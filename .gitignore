@@ -1,0 +1,12 @@
+*.root
+*.pyc
+__pycache__/
+*~
+\#*\#
+
+*.log
+
+*.so
+*.o
+*.pcm
+*.d
