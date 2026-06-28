@@ -57,15 +57,29 @@ Example:
 ```bash
 cd HiggsDalitz/NanoBridge/python
 
-python run_xAnaProducer.py
+python3 run_xAnaProducerMultiFiles_fixed.py input2024C.txt outputs/2024C data
 ```
 
-or
+##---------------------------------------------------------------------
+## For condor submission:
+
+The workflow for each new era is just:
+
+Open submit_condor.py, change DATASET, ERA, MODE at the top
 
 ```bash
-python run_xAnaProducerMultiFiles.py
+python3 submit_condor.py
 ```
 
+If anything looks wrong in the first box, condor_rm <ClusterId> before jobs start running
+
+And for resubmission, open resubmit_failed.py, set FAILED_LIST to point to the right listFilesNotProcessed.txt, adjust ERA/MODE if needed, and
+
+```bash
+python3 resubmit_failed.py.
+```
+
+-------------------------------------------------------------------------
 ## Output
 
 NanoBridge produces reduced ROOT ntuples containing:
