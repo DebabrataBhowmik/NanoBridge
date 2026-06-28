@@ -60,7 +60,7 @@ cd HiggsDalitz/NanoBridge/python
 python3 run_xAnaProducerMultiFiles_fixed.py input2024C.txt outputs/2024C data
 ```
 
-##---------------------------------------------------------------------
+---------------------------------------------------------------------
 ## For condor submission:
 
 The workflow for each new era is just:
