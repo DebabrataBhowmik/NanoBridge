@@ -81,8 +81,9 @@ However, if you are lazy enough even to do what is being printed out on the term
 
 you can just run:
 
+```bash
 python3 check_status.py <Output_DirectoryName> (without "")
-
+```
 
 This will tells you almost everything, also will merge the failed file lists into a single file called "listFilesNotProcessed.txt" so that you can have a full list in one place.
 
