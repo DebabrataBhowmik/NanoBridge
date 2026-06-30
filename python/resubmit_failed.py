@@ -19,9 +19,10 @@ FLAVOUR     = "testmatch"  # longlunch=2h | workday=8h | tomorrow=24h
 #   Fixed paths — change only if you move your CMSSW area
 #================================================================
 
-CMSSW_BASE  = "/eos/user/d/dbhowmik/NCU/HiggsDalitz/Run3Analysis/2024Analysis/CMSSW_15_0_19"
+#CMSSW_BASE  = "/eos/user/d/dbhowmik/NCU/HiggsDalitz/Run3Analysis/2024Analysis/CMSSW_15_0_19"
+CMSSW_BASE  = "/afs/cern.ch/work/d/dbhowmik/public/NCU/HiggsDalitz/Run3Analysis/CMSSW_15_0_19"
 WORK_DIR    = f"{CMSSW_BASE}/src/HiggsDalitz/NanoBridge/python"
-OUTPUT_BASE = f"/eos/user/d/dbhowmik/NCU/HiggsDalitz/Run3Analysis/2024Analysis/NanoBridge_outputs"
+OUTPUT_BASE = "/eos/user/d/dbhowmik/NCU/HiggsDalitz/Run3Analysis/2024Analysis/NanoBridge_outputs"
 LOG_BASE    = f"{WORK_DIR}/condor_logs"
 WRAPPER     = f"{WORK_DIR}/condor_wrapper.sh"
 
