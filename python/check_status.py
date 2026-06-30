@@ -5,12 +5,14 @@
 # Run anytime to check on ONE submission's CONDOR jobs:
 #   - jobs still queued/running for this submission
 #   - output _xAna.root files found in this directory
-#   - files still listed as failed
+#   - files still listed as failed (merged from each job's own
+#     FAILED_<name>_<pid>.txt marker into one listFilesNotProcessed.txt
+#     — see condor_wrapper.sh for why each job writes its own marker)
 #
 # Point OUTPUT_DIR at whichever directory you care about right
 # now — the original submission, or a later resubmission. Each
 # directory is self-contained (has its own cluster_id.txt,
-# input_filelist.txt, and listFilesNotProcessed.txt), so there's
+# input_filelist.txt, and FAILED_*.txt markers), so there's
 # no need to track history across resubmissions.
 #
 # Run with: python3 check_status.py
@@ -73,6 +75,35 @@ def count_lines(path):
     with open(path) as f:
         return sum(1 for ln in f if ln.strip() and not ln.startswith("#"))
 
+def merge_failed_files(out_dir):
+    """
+    Each CONDOR job writes its own uniquely-named FAILED_<name>_<pid>.txt
+    into out_dir (since they all share the same output directory and
+    a single shared listFilesNotProcessed.txt would get overwritten by
+    whichever job finishes last — see condor_wrapper.sh). Combine them
+    here into one listFilesNotProcessed.txt for resubmit_failed.py to
+    consume, and return the count.
+    """
+    import glob
+    markers = sorted(glob.glob(os.path.join(out_dir, "FAILED_*.txt")))
+    if not markers:
+        return count_lines(os.path.join(out_dir, "listFilesNotProcessed.txt"))
+
+    entries = []
+    for m in markers:
+        with open(m) as f:
+            for ln in f:
+                ln = ln.strip()
+                if ln and not ln.startswith("#"):
+                    entries.append(ln)
+
+    combined_path = os.path.join(out_dir, "listFilesNotProcessed.txt")
+    with open(combined_path, "w") as cf:
+        cf.write("# Combined from per-job FAILED_*.txt markers (see condor_wrapper.sh)\n\n")
+        for e in entries:
+            cf.write(e + "\n")
+    return len(entries)
+
 def main():
     if not os.path.exists(OUTPUT_DIR):
         print(f"[ERROR] Output directory not found: {OUTPUT_DIR}")
@@ -81,7 +112,7 @@ def main():
     n_expected = count_lines(os.path.join(OUTPUT_DIR, "input_filelist.txt"))
     out_files  = [f for f in os.listdir(OUTPUT_DIR) if f.endswith("_xAna.root")]
     n_done     = len(out_files)
-    n_failed   = count_lines(os.path.join(OUTPUT_DIR, "listFilesNotProcessed.txt"))
+    n_failed   = merge_failed_files(OUTPUT_DIR)
 
     cluster_id = get_cluster_id(OUTPUT_DIR)
     n_active, n_held = (None, None)

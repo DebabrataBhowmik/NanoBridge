@@ -26,7 +26,7 @@ LOG_BASE    = f"{WORK_DIR}/condor_logs"
 WRAPPER     = f"{WORK_DIR}/condor_wrapper.sh"
 
 #================================================================
-import os, sys, subprocess
+import os, sys, shutil, subprocess
 from datetime import datetime
 
 FLAVOUR_TIMES = {
@@ -60,6 +60,73 @@ def box(lines):
         print(f"|  {l:<{width-4}}  |")
     print(bar)
 
+def get_valid_proxy():
+    """
+    Check for a valid grid proxy (via voms-proxy-info). If missing or
+    expired, print instructions and exit — CONDOR jobs need this to
+    access files via xrootd.
+    """
+    try:
+        result = subprocess.run(
+            ["voms-proxy-info", "--exists"],
+            capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            raise RuntimeError("no valid proxy")
+    except (FileNotFoundError, RuntimeError):
+        print("[ERROR] No valid grid proxy found.")
+        print("        Generate one with:")
+        print("          voms-proxy-init --voms cms --valid 168:00")
+        print("        Then re-run this script.")
+        sys.exit(1)
+
+    path_result = subprocess.run(
+        ["voms-proxy-info", "--path"], capture_output=True, text=True
+    )
+    proxy_path = path_result.stdout.strip()
+
+    # voms-proxy-info can report a path that no longer exists on disk
+    # (e.g. /tmp cleared, stale session). CONDOR's file transfer will
+    # fail with a cryptic "No such file or directory" hold if we don't
+    # catch this here first.
+    if not proxy_path or not os.path.isfile(proxy_path):
+        print(f"[ERROR] Proxy path reported by voms-proxy-info does not exist on disk:")
+        print(f"        {proxy_path or '(empty)'}")
+        print("        Regenerate it with:")
+        print("          voms-proxy-init --voms cms --valid 168:00")
+        print("        Then re-run this script.")
+        sys.exit(1)
+
+    # CONDOR's remote schedd (e.g. bigbird13) cannot read your local /tmp
+    # on lxplus — that's machine-local storage, not shared. Rather than
+    # requiring you to permanently relocate your proxy (which other tools
+    # may expect at the default /tmp location), we copy it to an
+    # AFS-visible staging area just for this submission.
+    if proxy_path.startswith("/tmp"):
+        staging_dir = os.path.join(WORK_DIR, ".proxy_staging")
+        os.makedirs(staging_dir, exist_ok=True)
+        staged_path = os.path.join(staging_dir, os.path.basename(proxy_path))
+        shutil.copyfile(proxy_path, staged_path)
+        os.chmod(staged_path, 0o600)
+        print(f"[INFO] Proxy is under /tmp (not visible to the CONDOR schedd).")
+        print(f"       Copied to AFS-visible staging location for this submission:")
+        print(f"       {staged_path}")
+        proxy_path = staged_path
+
+    timeleft_result = subprocess.run(
+        ["voms-proxy-info", "--timeleft"], capture_output=True, text=True
+    )
+    try:
+        timeleft = int(timeleft_result.stdout.strip())
+    except ValueError:
+        timeleft = None
+
+    if timeleft is not None and timeleft < 3600:
+        print(f"[WARN] Proxy valid for less than 1 hour ({timeleft}s left).")
+        print("       Consider renewing: voms-proxy-init --voms cms --valid 168:00")
+
+    return proxy_path
+
 def query_das(dataset):
     print("[INFO] Querying DAS ...")
     cmd = ["dasgoclient", "-query", f"file dataset={dataset}", "-limit", "0"]
@@ -88,6 +155,7 @@ def main():
     os.makedirs(log_dir, exist_ok=True)
 
     flavour_time = FLAVOUR_TIMES.get(FLAVOUR, "?")
+    proxy_path = get_valid_proxy()
 
     # ── Print config box ─────────────────────────────────────────────────────
     print()
@@ -101,6 +169,7 @@ def main():
         f"  Output    :  {out_dir}",
         f"  Logs      :  {log_dir}",
         f"  Submitted :  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        f"  Proxy     :  {proxy_path}",
     ])
     print()
 
@@ -124,7 +193,9 @@ def main():
         "",
         "universe              = vanilla",
         f"executable            = {WRAPPER}",
-        "should_transfer_files = NO",
+        "should_transfer_files = YES",
+        "when_to_transfer_output = ON_EXIT",
+        f"x509userproxy         = {proxy_path}",
         "",
         f'+JobFlavour           = "{FLAVOUR}"',
         "",
