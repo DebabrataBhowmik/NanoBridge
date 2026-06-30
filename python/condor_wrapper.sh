@@ -9,7 +9,7 @@ INPUT_FILE=$1
 OUTPUT_DIR=$2
 MODE=$3
 
-CMSSW_BASE=/eos/user/d/dbhowmik/NCU/HiggsDalitz/Run3Analysis/2024Analysis/CMSSW_15_0_19
+CMSSW_BASE=/afs/cern.ch/work/d/dbhowmik/public/NCU/HiggsDalitz/Run3Analysis/CMSSW_15_0_19
 PYTHON_DIR=${CMSSW_BASE}/src/HiggsDalitz/NanoBridge/python
 
 echo "=============================================="

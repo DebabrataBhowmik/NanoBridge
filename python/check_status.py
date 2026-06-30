@@ -24,10 +24,17 @@
 #   outputs/2024C        (original submission)
 #   outputs/2024C_v2     (first resubmission)
 #   outputs/2024C_v3     (second resubmission), etc.
-OUTPUT_DIR = "/eos/user/d/dbhowmik/NCU/HiggsDalitz/Run3Analysis/2024Analysis/CMSSW_15_0_19/src/HiggsDalitz/NanoBridge/python/outputs/2024C"
+
+import os, sys, subprocess
+
+if len(sys.argv) != 2:
+    print(f"Usage: {sys.argv[0]} <output_directory>")
+    sys.exit(1)
+
+OUTPUT_DIR = sys.argv[1]
+#OUTPUT_DIR = "/eos/user/d/dbhowmik/NCU/HiggsDalitz/Run3Analysis/2024Analysis/CMSSW_15_0_19/src/HiggsDalitz/NanoBridge/python/outputs/2024C"
 
 #================================================================
-import os, sys, subprocess
 
 def box(lines):
     width = max(len(l) for l in lines) + 4

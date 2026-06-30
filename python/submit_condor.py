@@ -9,10 +9,10 @@
 #            *** CONFIGURE HERE BEFORE RUNNING ***
 #================================================================
 
-DATASET  = "/MuonEG/Run2024C/NANOAOD/MINIv6NANOv15-v1"
+DATASET  = "/MuonEG/Run2024C-MINIv6NANOv15-v1/NANOAOD"
 ERA      = "2024C"
 MODE     = "data"          # "data" or "mc"
-FLAVOUR  = "testmatch"     # longlunch=2h | workday=8h | tomorrow=24h
+FLAVOUR  = "tomorrow"     # longlunch=2h | workday=8h | tomorrow=24h
 
 #================================================================
 #   Fixed paths — change only if you move your CMSSW area
