@@ -2,7 +2,22 @@
 #================================================================
 # resubmit_failed.py
 #
-# Reads listFilesNotProcessed.txt and resubmits failed jobs.
+# Resubmits failed files from a previous CONDOR submission.
+#
+# Source of failures: FAILED_LIST should point at a
+# listFilesNotProcessed.txt inside the output directory of a
+# previous submission. If that file doesn't exist yet (e.g. you
+# haven't run check_status.py), this script builds it itself by
+# merging any FAILED_*.txt markers found in that same directory.
+#
+# Output directory: derived from FAILED_LIST's parent directory,
+# NOT from a fixed OUTPUT_BASE/ERA. E.g. if FAILED_LIST lives in
+#   .../NanoBridge_outputs/2024C_v13/listFilesNotProcessed.txt
+# the resubmission output goes to a NEW directory NESTED inside it:
+#   .../NanoBridge_outputs/2024C_v13/2024C_v13_resubmitted
+# (then _v2, _v3, ... if resubmitted multiple times from the same
+# source directory).
+#
 # Run with: python3 resubmit_failed.py
 #================================================================
 
@@ -10,8 +25,7 @@
 #            *** CONFIGURE HERE BEFORE RUNNING ***
 #================================================================
 
-FAILED_LIST = "/eos/user/d/dbhowmik/NCU/HiggsDalitz/Run3Analysis/2024Analysis/CMSSW_15_0_19/src/HiggsDalitz/NanoBridge/python/outputs/2024C/listFilesNotProcessed.txt"
-ERA         = "2024C"
+FAILED_LIST = "/eos/user/d/dbhowmik/NCU/HiggsDalitz/Run3Analysis/2024Analysis/NanoBridge_outputs/2024C/listFilesNotProcessed.txt"
 MODE        = "data"       # "data" or "mc"
 FLAVOUR     = "testmatch"  # longlunch=2h | workday=8h | tomorrow=24h
 
@@ -19,15 +33,13 @@ FLAVOUR     = "testmatch"  # longlunch=2h | workday=8h | tomorrow=24h
 #   Fixed paths — change only if you move your CMSSW area
 #================================================================
 
-#CMSSW_BASE  = "/eos/user/d/dbhowmik/NCU/HiggsDalitz/Run3Analysis/2024Analysis/CMSSW_15_0_19"
 CMSSW_BASE  = "/afs/cern.ch/work/d/dbhowmik/public/NCU/HiggsDalitz/Run3Analysis/CMSSW_15_0_19"
 WORK_DIR    = f"{CMSSW_BASE}/src/HiggsDalitz/NanoBridge/python"
-OUTPUT_BASE = "/eos/user/d/dbhowmik/NCU/HiggsDalitz/Run3Analysis/2024Analysis/NanoBridge_outputs"
 LOG_BASE    = f"{WORK_DIR}/condor_logs"
 WRAPPER     = f"{WORK_DIR}/condor_wrapper.sh"
 
 #================================================================
-import os, sys, shutil, subprocess
+import os, sys, glob, shutil, subprocess
 from datetime import datetime
 
 FLAVOUR_TIMES = {
@@ -60,6 +72,42 @@ def box(lines):
     for l in lines:
         print(f"|  {l:<{width-4}}  |")
     print(bar)
+
+def ensure_failed_list(failed_list_path):
+    """
+    If failed_list_path already exists, use it as-is. Otherwise, build it
+    by merging any FAILED_*.txt markers found in the same directory (left
+    by condor_wrapper.sh, one per failed job). This means you don't need
+    to run check_status.py first — this script is self-sufficient.
+    """
+    if os.path.exists(failed_list_path):
+        return
+
+    src_dir = os.path.dirname(failed_list_path)
+    markers = sorted(glob.glob(os.path.join(src_dir, "FAILED_*.txt")))
+
+    if not markers:
+        print(f"[ERROR] {failed_list_path} not found, and no FAILED_*.txt")
+        print(f"        markers exist in {src_dir} to build it from.")
+        print(f"        Either nothing failed, or the batch hasn't finished yet.")
+        sys.exit(1)
+
+    entries = []
+    for m in markers:
+        with open(m) as f:
+            for ln in f:
+                ln = ln.strip()
+                if ln and not ln.startswith("#"):
+                    entries.append(ln)
+
+    with open(failed_list_path, "w") as cf:
+        cf.write(f"# Built automatically from {len(markers)} FAILED_*.txt marker(s)\n\n")
+        for e in entries:
+            cf.write(e + "\n")
+
+    print(f"[INFO] {failed_list_path} did not exist — built it from")
+    print(f"       {len(markers)} marker file(s) found in {src_dir}")
+    print(f"       ({len(entries)} failed file(s) total)\n")
 
 def get_valid_proxy():
     """
@@ -132,8 +180,9 @@ def main():
     if MODE not in ("data", "mc"):
         print("[ERROR] MODE must be 'data' or 'mc'"); sys.exit(1)
 
-    if not os.path.exists(FAILED_LIST):
-        print(f"[ERROR] File not found: {FAILED_LIST}"); sys.exit(1)
+    # Build listFilesNotProcessed.txt ourselves if it doesn't exist yet —
+    # no dependency on check_status.py having been run first.
+    ensure_failed_list(FAILED_LIST)
 
     failed_files = []
     with open(FAILED_LIST) as f:
@@ -149,10 +198,17 @@ def main():
         print("[INFO] No failed files found. Nothing to resubmit.")
         sys.exit(0)
 
-    era_base = os.path.join(OUTPUT_BASE, ERA)
-    out_dir  = make_versioned_dir(era_base)
-    log_dir  = os.path.join(LOG_BASE, ERA + "_resub",
-                            datetime.now().strftime("%Y%m%d_%H%M%S"))
+    # Output directory is derived from FAILED_LIST's own location — a
+    # sibling of the source directory, named <source_dir>_resubmitted
+    # (then _v2, _v3, ... if resubmitted multiple times from the same
+    # source). NOT a fresh directory under some fixed OUTPUT_BASE/ERA.
+    src_dir   = os.path.dirname(os.path.abspath(FAILED_LIST))
+    resub_base = os.path.join(src_dir, os.path.basename(src_dir) + "_resubmitted")
+    out_dir    = make_versioned_dir(resub_base)
+
+    era_label = os.path.basename(src_dir)   # used only for labels/filenames below
+    log_dir   = os.path.join(LOG_BASE, era_label + "_resub",
+                             datetime.now().strftime("%Y%m%d_%H%M%S"))
     os.makedirs(log_dir, exist_ok=True)
 
     flavour_time = FLAVOUR_TIMES.get(FLAVOUR, "?")
@@ -164,7 +220,7 @@ def main():
         "  xAnaProducer  —  CONDOR Resubmission",
         "",
         f"  Failed list :  {FAILED_LIST}",
-        f"  Era         :  {ERA}",
+        f"  Source dir  :  {src_dir}",
         f"  Mode        :  {MODE}",
         f"  Flavour     :  {FLAVOUR}  ({flavour_time} per job)",
         f"  Files       :  {len(failed_files)} to resubmit",
@@ -176,11 +232,11 @@ def main():
     print()
 
     # ── Write CONDOR submit file ──────────────────────────────────────────────
-    submit_path = os.path.join(out_dir, f"condor_resub_{ERA}.jdl")
+    submit_path = os.path.join(out_dir, f"condor_resub_{era_label}.jdl")
     lines = [
         f"# CONDOR resubmit file — generated by resubmit_failed.py",
         f"# Source  : {FAILED_LIST}",
-        f"# Era     : {ERA}   Mode: {MODE}",
+        f"# Mode    : {MODE}",
         f"# Generated : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "universe              = vanilla",
@@ -227,7 +283,7 @@ def main():
     # Save the resubmitted file list (so check_status.py can compute "expected" count for this dir)
     with open(os.path.join(out_dir, "input_filelist.txt"), "w") as fl:
         fl.write(f"# Resubmission of failed files from: {FAILED_LIST}\n")
-        fl.write(f"# Era: {ERA}   Mode: {MODE}\n\n")
+        fl.write(f"# Mode: {MODE}\n\n")
         for fpath in failed_files:
             fl.write(fpath + "\n")
 
