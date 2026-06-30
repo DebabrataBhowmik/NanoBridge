@@ -13,7 +13,7 @@
 FAILED_LIST = "/eos/user/d/dbhowmik/NCU/HiggsDalitz/Run3Analysis/2024Analysis/CMSSW_15_0_19/src/HiggsDalitz/NanoBridge/python/outputs/2024C/listFilesNotProcessed.txt"
 ERA         = "2024C"
 MODE        = "data"       # "data" or "mc"
-FLAVOUR     = "longlunch"  # longlunch=2h | workday=8h | tomorrow=24h
+FLAVOUR     = "testmatch"  # longlunch=2h | workday=8h | tomorrow=24h
 
 #================================================================
 #   Fixed paths — change only if you move your CMSSW area
@@ -21,7 +21,7 @@ FLAVOUR     = "longlunch"  # longlunch=2h | workday=8h | tomorrow=24h
 
 CMSSW_BASE  = "/eos/user/d/dbhowmik/NCU/HiggsDalitz/Run3Analysis/2024Analysis/CMSSW_15_0_19"
 WORK_DIR    = f"{CMSSW_BASE}/src/HiggsDalitz/NanoBridge/python"
-OUTPUT_BASE = f"{WORK_DIR}/outputs"
+OUTPUT_BASE = f"/eos/user/d/dbhowmik/NCU/HiggsDalitz/Run3Analysis/2024Analysis/NanoBridge_outputs"
 LOG_BASE    = f"{WORK_DIR}/condor_logs"
 WRAPPER     = f"{WORK_DIR}/condor_wrapper.sh"
 
@@ -146,6 +146,18 @@ def main():
             parts = line.strip().rstrip(".").split()
             cluster_id = parts[-1]
             break
+
+    # Save ClusterId so check_status.py can track this resubmission's queue status
+    if cluster_id:
+        with open(os.path.join(out_dir, "cluster_id.txt"), "w") as cf:
+            cf.write(cluster_id + "\n")
+
+    # Save the resubmitted file list (so check_status.py can compute "expected" count for this dir)
+    with open(os.path.join(out_dir, "input_filelist.txt"), "w") as fl:
+        fl.write(f"# Resubmission of failed files from: {FAILED_LIST}\n")
+        fl.write(f"# Era: {ERA}   Mode: {MODE}\n\n")
+        for fpath in failed_files:
+            fl.write(fpath + "\n")
 
     print()
     box([

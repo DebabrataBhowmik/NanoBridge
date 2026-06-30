@@ -12,7 +12,7 @@
 DATASET  = "/MuonEG/Run2024C/NANOAOD/MINIv6NANOv15-v1"
 ERA      = "2024C"
 MODE     = "data"          # "data" or "mc"
-FLAVOUR  = "longlunch"     # longlunch=2h | workday=8h | tomorrow=24h
+FLAVOUR  = "testmatch"     # longlunch=2h | workday=8h | tomorrow=24h
 
 #================================================================
 #   Fixed paths — change only if you move your CMSSW area
@@ -20,7 +20,7 @@ FLAVOUR  = "longlunch"     # longlunch=2h | workday=8h | tomorrow=24h
 
 CMSSW_BASE  = "/eos/user/d/dbhowmik/NCU/HiggsDalitz/Run3Analysis/2024Analysis/CMSSW_15_0_19"
 WORK_DIR    = f"{CMSSW_BASE}/src/HiggsDalitz/NanoBridge/python"
-OUTPUT_BASE = f"{WORK_DIR}/outputs"
+OUTPUT_BASE = f"/eos/user/d/dbhowmik/NCU/HiggsDalitz/Run3Analysis/2024Analysis/NanoBridge_outputs"
 LOG_BASE    = f"{WORK_DIR}/condor_logs"
 WRAPPER     = f"{WORK_DIR}/condor_wrapper.sh"
 
@@ -34,8 +34,8 @@ FLAVOUR_TIMES = {
     "longlunch":  "2 h",
     "workday":    "8 h",
     "tomorrow":   "24 h",
-    "testmatch":  "3 h",
-    "nextweek":   "168 h",
+    "testmatch":  "3 d",
+    "nextweek":   "1 w",
 }
 
 def make_versioned_dir(base):
@@ -155,6 +155,12 @@ def main():
             parts = line.strip().rstrip(".").split()
             cluster_id = parts[-1]
             break
+
+    # Save ClusterId to disk so check_status.py / resubmit scripts can find it automatically
+    if cluster_id:
+        cluster_id_path = os.path.join(out_dir, "cluster_id.txt")
+        with open(cluster_id_path, "w") as cf:
+            cf.write(cluster_id + "\n")
 
     print()
     box([
