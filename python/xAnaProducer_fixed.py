@@ -315,7 +315,7 @@ class xAnaProducer(Module):
                             s4, e2x2, e5x5,
                             0.0, 0.0, 0.0, 0.0, hoe,
                             E, E, E, E, E, E, E, E, E,
-                            r9, -99.0, r9, elVeto))
+                            r9, mvaID, r9, elVeto))
 
         if len(photons) < 1:
             return False
