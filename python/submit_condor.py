@@ -11,6 +11,7 @@
 
 DATASET  = "/MuonEG/Run2024C-MINIv6NANOv15-v1/NANOAOD"
 ERA      = "2024C"
+YEAR     = "2024"          # 2022, 2023, 2024, 2025, 2026
 MODE     = "data"          # "data" or "mc"
 FLAVOUR  = "tomorrow"     # longlunch=2h | workday=8h | tomorrow=24h
 
@@ -164,6 +165,7 @@ def main():
         "",
         f"  Dataset   :  {DATASET}",
         f"  Era       :  {ERA}",
+        f"  Year      :  {YEAR}",
         f"  Mode      :  {MODE}",
         f"  Flavour   :  {FLAVOUR}  ({flavour_time} per job)",
         f"  Output    :  {out_dir}",
@@ -207,7 +209,7 @@ def main():
         "",
     ]
     for fpath in file_list:
-        lines += [f"arguments = {fpath} {out_dir} {MODE}", "queue", ""]
+        lines += [f"arguments = {fpath} {out_dir} {MODE} {YEAR}", "queue", ""]
 
     with open(submit_path, "w") as sf:
         sf.write("\n".join(lines))

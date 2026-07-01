@@ -2,12 +2,13 @@
 #---------------------------------------------------------------
 # condor_wrapper.sh
 # Called by each CONDOR job with a single input file path.
-# Usage: condor_wrapper.sh <input_file> <output_dir> <data|mc>
+# Usage: condor_wrapper.sh <input_file> <output_dir> <data|mc> <year>
 #---------------------------------------------------------------
 
 INPUT_FILE=$1
 OUTPUT_DIR=$2
 MODE=$3
+YEAR=$4
 
 CMSSW_BASE=/afs/cern.ch/work/d/dbhowmik/public/NCU/HiggsDalitz/Run3Analysis/CMSSW_15_0_19
 PYTHON_DIR=${CMSSW_BASE}/src/HiggsDalitz/NanoBridge/python
@@ -17,6 +18,7 @@ echo " CONDOR job starting"
 echo " Input  : ${INPUT_FILE}"
 echo " Output : ${OUTPUT_DIR}"
 echo " Mode   : ${MODE}"
+echo " Year   : ${YEAR}"
 echo " Host   : $(hostname)"
 echo " Date   : $(date)"
 echo "=============================================="
@@ -52,7 +54,7 @@ cd ${PYTHON_DIR}
 JOB_SCRATCH="${OUTPUT_DIR}/.job_scratch_$(basename ${INPUT_FILE} .root)_${$}"
 mkdir -p "${JOB_SCRATCH}"
 
-python3 run_xAnaProducerMultiFiles_fixed.py <(echo "${INPUT_FILE}") "${JOB_SCRATCH}" ${MODE}
+python3 run_xAnaProducerMultiFiles_fixed.py <(echo "${INPUT_FILE}") "${JOB_SCRATCH}" ${MODE} ${YEAR}
 EXIT_CODE=$?
 
 # Move any produced ROOT output into the real shared output directory
@@ -72,6 +74,7 @@ fi
 
 # Clean up the now-empty job scratch directory
 rmdir "${JOB_SCRATCH}" 2>/dev/null
+
 echo "=============================================="
 echo " Job finished with exit code: ${EXIT_CODE}"
 echo " Date: $(date)"

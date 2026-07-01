@@ -5,36 +5,22 @@
 # Run anytime to check on ONE submission's CONDOR jobs:
 #   - jobs still queued/running for this submission
 #   - output _xAna.root files found in this directory
-#   - files still listed as failed (merged from each job's own
-#     FAILED_<name>_<pid>.txt marker into one listFilesNotProcessed.txt
-#     — see condor_wrapper.sh for why each job writes its own marker)
+#   - files still listed as failed (reads listFilesNotProcessed.txt
+#     directly — run merge_failed.py first if the batch just finished)
 #
 # Point OUTPUT_DIR at whichever directory you care about right
-# now — the original submission, or a later resubmission. Each
-# directory is self-contained (has its own cluster_id.txt,
-# input_filelist.txt, and FAILED_*.txt markers), so there's
-# no need to track history across resubmissions.
+# now — the original submission, or a later resubmission.
 #
-# Run with: python3 check_status.py
+# Run with: python3 check_status.py <output_directory>
 #================================================================
 
-#================================================================
-#            *** CONFIGURE HERE BEFORE RUNNING ***
-#================================================================
-
-# Point this at the directory you want to check, e.g.:
-#   outputs/2024C        (original submission)
-#   outputs/2024C_v2     (first resubmission)
-#   outputs/2024C_v3     (second resubmission), etc.
-
-import os, sys, subprocess
+import os, sys, glob, subprocess
 
 if len(sys.argv) != 2:
     print(f"Usage: {sys.argv[0]} <output_directory>")
     sys.exit(1)
 
 OUTPUT_DIR = sys.argv[1]
-#OUTPUT_DIR = "/eos/user/d/dbhowmik/NCU/HiggsDalitz/Run3Analysis/2024Analysis/CMSSW_15_0_19/src/HiggsDalitz/NanoBridge/python/outputs/2024C"
 
 #================================================================
 
@@ -75,35 +61,6 @@ def count_lines(path):
     with open(path) as f:
         return sum(1 for ln in f if ln.strip() and not ln.startswith("#"))
 
-def merge_failed_files(out_dir):
-    """
-    Each CONDOR job writes its own uniquely-named FAILED_<name>_<pid>.txt
-    into out_dir (since they all share the same output directory and
-    a single shared listFilesNotProcessed.txt would get overwritten by
-    whichever job finishes last — see condor_wrapper.sh). Combine them
-    here into one listFilesNotProcessed.txt for resubmit_failed.py to
-    consume, and return the count.
-    """
-    import glob
-    markers = sorted(glob.glob(os.path.join(out_dir, "FAILED_*.txt")))
-    if not markers:
-        return count_lines(os.path.join(out_dir, "listFilesNotProcessed.txt"))
-
-    entries = []
-    for m in markers:
-        with open(m) as f:
-            for ln in f:
-                ln = ln.strip()
-                if ln and not ln.startswith("#"):
-                    entries.append(ln)
-
-    combined_path = os.path.join(out_dir, "listFilesNotProcessed.txt")
-    with open(combined_path, "w") as cf:
-        cf.write("# Combined from per-job FAILED_*.txt markers (see condor_wrapper.sh)\n\n")
-        for e in entries:
-            cf.write(e + "\n")
-    return len(entries)
-
 def main():
     if not os.path.exists(OUTPUT_DIR):
         print(f"[ERROR] Output directory not found: {OUTPUT_DIR}")
@@ -112,7 +69,12 @@ def main():
     n_expected = count_lines(os.path.join(OUTPUT_DIR, "input_filelist.txt"))
     out_files  = [f for f in os.listdir(OUTPUT_DIR) if f.endswith("_xAna.root")]
     n_done     = len(out_files)
-    n_failed   = merge_failed_files(OUTPUT_DIR)
+    n_failed   = count_lines(os.path.join(OUTPUT_DIR, "listFilesNotProcessed.txt"))
+
+    # Warn if there are unmerged per-job failure markers sitting around —
+    # these mean some files failed but haven't been combined into
+    # listFilesNotProcessed.txt yet.
+    unmerged_markers = glob.glob(os.path.join(OUTPUT_DIR, "FAILED_*.txt"))
 
     cluster_id = get_cluster_id(OUTPUT_DIR)
     n_active, n_held = (None, None)
@@ -163,6 +125,12 @@ def main():
     print()
     box(lines)
     print()
+
+    if unmerged_markers:
+        print(f"\033[93m[WARN] {len(unmerged_markers)} unmerged FAILED_*.txt marker(s) found.\033[0m")
+        print(f"\033[93m       Run this first to update listFilesNotProcessed.txt:\033[0m")
+        print(f"\033[93m       python3 merge_failed.py {OUTPUT_DIR}\033[0m")
+        print()
 
 if __name__ == "__main__":
     main()
